@@ -59,7 +59,6 @@ namespace ECommerce.Api.Controllers
             }
         }
 
-
         [HttpGet("confirm-email")]
         public async Task<IActionResult> ConfirmEmail([Required]string token, [Required]string email)
         {
@@ -96,6 +95,72 @@ namespace ECommerce.Api.Controllers
                 if (response.Status)
                 {
                     return StatusCode(StatusCodes.Status200OK, response);
+                }
+
+                return StatusCode(StatusCodes.Status400BadRequest, response);
+            }
+            catch
+            {
+                throw;
+            }
+        }
+
+        [HttpGet("forgot-password")]
+        public async Task<IActionResult> ForgetPassword([Required] string email)
+        {
+            try
+            {
+                ApiResponse response = new() { Status = false, Messages = new List<string>() };
+
+                response = await _authenticationService.SendForgetPasswordLink(email);
+
+                if (response.Status)
+                {
+                    return StatusCode(StatusCodes.Status200OK, response);
+                }
+
+                return StatusCode(StatusCodes.Status400BadRequest, response);
+            }
+            catch
+            {
+                throw;
+            }
+        }
+
+        [HttpGet("reset-password")]
+        public async Task<IActionResult> ResetPassword([Required] string token, [Required] string email)
+        {
+            try
+            {
+                ResetPasswordDto model = new() { Token = token, Email = email };
+                ApiResponse response = new() { Status = true, Messages = new List<string>(), Data = model };
+                return StatusCode(StatusCodes.Status200OK, response); // Using redirection to get the token from email to my frontend application
+            }
+            catch
+            {
+                throw;
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(ResetPasswordDto model)
+        {
+            try
+            {
+                ApiResponse response = new() { Status = false, Messages = new List<string>()};
+
+                if(Helper.ConfirmPassword(model.Password, model.ConfirmPassword))
+                {
+                    response = await _authenticationService.ResetPassword(model);
+                    }
+                else
+                {
+                    response.Messages.Add("Passwords do not match");
+                }
+
+                if (response.Status)
+                {
+                    return StatusCode(StatusCodes.Status200OK, response); 
                 }
 
                 return StatusCode(StatusCodes.Status400BadRequest, response);
