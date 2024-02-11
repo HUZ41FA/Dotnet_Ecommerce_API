@@ -1,8 +1,8 @@
 # ignoring appsettings:
-ECommerce.Api/appsettings.Development.json
-ECommerce.Api/appsettings.Production.json
-ECommerce.Api/appsettings.Staging.json
-ECommerce.Api/appsettings.QA.json
+/ECommerce.Api/appsettings.Development.json
+/ECommerce.Api/appsettings.Production.json
+/ECommerce.Api/appsettings.Staging.json
+/ECommerce.Api/appsettings.QA.json
 
 
 # User-specific files
@@ -218,3 +218,8 @@ project.lock.json
 
 # UWP Projects
 AppPackages/
+/ECommerce.Api/apsettings.Development.json
+/ECommerce.Api/apsettings.Local.json
+/ECommerce.Api/apsettings.Production.json
+/ECommerce.Api/apsettings.UAT.json
+/ECommerce.Api/apsettings.QA.json
