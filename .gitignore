@@ -1,8 +1,4 @@
-# ignoring appsettings:
-ECommerce.Api/appsettings.Development.json
-ECommerce.Api/appsettings.Production.json
-ECommerce.Api/appsettings.Staging.json
-ECommerce.Api/appsettings.QA.json
+
 
 
 # User-specific files

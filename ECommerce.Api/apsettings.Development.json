@@ -1,0 +1,23 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnectionString": ""
+  },
+  "EmailConfiguration": {
+    "FromEmail": "",
+    "UserName": "",
+    "Password": "",
+    "SmtpServer": "",
+    "Port": ""
+  },
+  "JWT": {
+    "ValidAudience": "",
+    "ValidHost": "",
+    "Secret": ""
+  }
+}
