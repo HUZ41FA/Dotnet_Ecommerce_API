@@ -1,9 +1,9 @@
-﻿using ECommerce.Domain.Common;
+﻿using ECommerce.Domain.Models.Common;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 
-namespace ECommerce.Domain.Application
+namespace ECommerce.Domain.Models.Application
 {
     public class Address : CommonFields
     {
@@ -24,7 +24,9 @@ namespace ECommerce.Domain.Application
 
         #region Relationships
         public string CityId { get; set; }
-        public City City { get; set; }
+
+        [ForeignKey(nameof(CityId))]
+        public virtual City City { get; set; }
         #endregion
     }
 }

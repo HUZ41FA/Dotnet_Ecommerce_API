@@ -7,9 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Cloud\FileStorage\" />
-    <Folder Include="DataAccess\GenericRepository\" />
-    <Folder Include="DataAccess\UnitofWork\" />
+    <Compile Remove="Cloud\**" />
+    <EmbeddedResource Remove="Cloud\**" />
+    <None Remove="Cloud\**" />
   </ItemGroup>
 
   <ItemGroup>

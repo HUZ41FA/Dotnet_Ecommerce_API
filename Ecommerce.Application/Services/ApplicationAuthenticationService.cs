@@ -1,50 +1,50 @@
 ﻿using ECommerce.Application.Dtos.Authentication;
-using ECommerce.Domain.Application;
+using ECommerce.Domain.Models.Application;
 using ECommerce.Infrastructure.DataAccess.ApplicationDbContext;
 using ECommerce.Utilities.Helper;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using ECommerce.Domain.Abstractions.IServices.Application;
+using ECommerce.Domain.Abstractions.IRepository.Application;
+using ECommerce.Domain.Abstractions.IUnitOfWork;
+using System.Web;
 
 namespace ECommerce.Application.Services
 {
-    public class AuthenticationService
+    public class ApplicationAuthenticationService : IApplicationAuthenticationService
     {
-        private readonly UserManager<SiteUser> _userManager;
-        private readonly RoleManager<IdentityRole> _roleManager;
-        private readonly ApplicationDBContext _context;
-        private readonly EmailService _emailService;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly ISiteUserService _siteUserService;
+        private readonly IEmailService _emailService;
         private readonly JwtConfig _jwtConfig;
         private readonly SignInManager<SiteUser> _signInManager;
 
-        public AuthenticationService(UserManager<SiteUser> userManager, RoleManager<IdentityRole> roleManager, ApplicationDBContext context, 
-            EmailService emailService, JwtConfig jwtConfig, SignInManager<SiteUser> signInManager)
+        public ApplicationAuthenticationService(
+            IUnitOfWork unitOfWork,
+            IEmailService emailService, 
+            ISiteUserService siteUserService, 
+            JwtConfig jwtConfig, 
+            SignInManager<SiteUser> signInManager)
         {
-            _userManager = userManager;
-            _roleManager = roleManager;
-            _context = context;
+            _unitOfWork = unitOfWork;
+            _siteUserService = siteUserService;
             _emailService = emailService;
             _jwtConfig = jwtConfig;
             _signInManager = signInManager;
         }
 
-        #region CRUD
-        public async Task<IdentityResult> Add(SiteUser model)
-        {
-            model.Id = Guid.NewGuid().ToString();
-            model.CreatedAt = DateTime.Now;
-            model.CreatedBy = model.Id;
-            return await _userManager.CreateAsync(model);
-        }
-        #endregion
         public async Task<ApiResponse> Register(SiteUser model)
         {
             try
             {
+                await _unitOfWork.BeginTransactionAsync();
+
                 ApiResponse response = new() { Status = false, Messages = new List<string>() };
-                SiteUser existingUser = await _userManager.FindByEmailAsync(model.Email);
+                SiteUser existingUser = await _siteUserService.GetByEmailAsync(model.Email);
 
                 if (existingUser != null)
                 {
@@ -54,19 +54,25 @@ namespace ECommerce.Application.Services
                 else
                 {
                     model.UserName = model.Email;
-                    IdentityResult userResult = await Add(model);
+                    IdentityResult userResult = await _siteUserService.AddAsync(model, model.Password);
 
                     if (userResult.Succeeded)
                     {
-                        string token = await _userManager.GenerateEmailConfirmationTokenAsync(model);
-                        string link = $"https://localhost:44371/api/authentication/confirm-email?token={token}&email={model.Email}";
-                        _emailService.SendMail(new[] { model.Email }, "Email Verification", $"Please follow the below link to confirm your email {link}");
+                        string token = await _siteUserService.GenerateEmailConfirmationTokenAsync(model);
+                        string link = Helper.GenerateEmailConfirmationLink(token, model.Email);
+                        
+                        //_emailService.SendMail(new[] { model.Email }, "Email Verification", $"Please follow the below link to confirm your email {link}");
+                        
                         response.Messages.Add("Registration Successful");
                         response.Status = true;
+
+                        await _unitOfWork.CommitChangesAsync();
+
                         return response;
                     }
                     else
                     {
+                        await _unitOfWork.RollbackChangesAsync();
                         response.Messages.AddRange(userResult.Errors.Select(e => e.Description));
                         return response;
                     }
@@ -77,32 +83,36 @@ namespace ECommerce.Application.Services
                 throw;
             }
         }
-
         public async Task<ApiResponse> ConfirmEmail(string token, string email)
         {
             try
             {
+                await _unitOfWork.BeginTransactionAsync();
+
                 ApiResponse response = new() { Status = false, Messages = new List<string>() };
-                SiteUser user = await _userManager.FindByEmailAsync(email);
+                SiteUser user = await _siteUserService.GetByEmailAsync(email);
 
                 if(user != null)
                 {
-                    IdentityResult result = await _userManager.ConfirmEmailAsync(user, token);
+                    IdentityResult result = await _siteUserService.ConfirmEmailAsync(user, token);
 
                     if (result.Succeeded)
                     {
+                        await _unitOfWork.CommitChangesAsync();
                         response.Status = true;
                         response.Messages.Add("Email Verified");
                         return response;
                     }
                     else
                     {
+                        await _unitOfWork.RollbackChangesAsync();
                         response.Messages.AddRange(result.Errors.Select(e => e.Description));
                         return response;
                     }
                 }
                 else
                 {
+                    await _unitOfWork.RollbackChangesAsync();
                     response.Messages.Add("Invalid Email");
                     return response;
                 }
@@ -112,13 +122,12 @@ namespace ECommerce.Application.Services
                 throw;
             }
         }
-
         public async Task<ApiResponse> Login(string email, string password)
         {
             try
             {
                 ApiResponse response = new() { Status = false, Messages = new List<string>() };
-                SiteUser user = await _userManager.FindByEmailAsync(email);
+                SiteUser user = await _siteUserService.GetByEmailAsync(email);
 
                 if (user != null && user.TwoFactorEnabled)
                 {
@@ -128,7 +137,7 @@ namespace ECommerce.Application.Services
                     return response;
                 }
 
-                if (user != null && await _userManager.CheckPasswordAsync(user!, password))
+                if (user != null && await _siteUserService.CheckPasswordAsync(user!, password))
                 {
 
                     List<Claim> claimList = await GetUserClaims(user); 
@@ -148,19 +157,18 @@ namespace ECommerce.Application.Services
                 throw;
             }
         }
-
         public async Task<ApiResponse> SendForgetPasswordLink(string email)
         {
             try
             {
                 ApiResponse response = new() { Status = false, Messages = new List<string>() };
-                var user = await _userManager.FindByEmailAsync(email);
+                var user = await _siteUserService.GetByEmailAsync(email);
                 if (user != null)
                 {
-                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                    var token = await _siteUserService.GeneratePasswordResetTokenAsync(user);
                     string link = $"https://localhost:44371/api/authentication/reset-password?token={token}&email={user.Email}";
 
-                    _emailService.SendMail(new[] { user.Email }, "Reset Password", $"Please click the link below to reset your password: {link}");
+                    await _emailService.SendMailAsync(new[] { user.Email }, "Reset Password", $"Please click the link below to reset your password: {link}");
                     
                     response.Status = true;
                     return response;
@@ -174,18 +182,17 @@ namespace ECommerce.Application.Services
                 throw;
             }
         }
-
-        public async Task<ApiResponse> ResetPassword(ResetPasswordDto model)
+        public async Task<ApiResponse> ResetPassword(string email, string password, string confirmPassword, string token)
         {
             try
             {
                 ApiResponse response = new() { Status = false, Messages = new List<string>() };
 
-                var user = await _userManager.FindByEmailAsync(model.Email);
+                var user = await _siteUserService.GetByEmailAsync(email);
 
                 if (user != null)
                 {
-                    var result = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
+                    var result = await _siteUserService.ResetPasswordAsync(user, token, password);
 
                     if (!result.Succeeded)
                     {
@@ -207,7 +214,6 @@ namespace ECommerce.Application.Services
                 throw;
             }
         }
-
         private async Task Send2FAEmail(SiteUser user, string password)
         {
             try
@@ -215,31 +221,30 @@ namespace ECommerce.Application.Services
                 await _signInManager.SignOutAsync();
                 await _signInManager.PasswordSignInAsync(user, password, false, true);
 
-                var token = _userManager.GenerateTwoFactorTokenAsync(user, "Email");
-                _emailService.SendMail(new[] { user.Email }, "OTP Confirmation", $"You requested a verification token: {token}");
+                var token = _siteUserService.GenerateTwoFactorTokenAsync(user, "Email");
+                await _emailService.SendMailAsync(new[] { user.Email }, "OTP Confirmation", $"You requested a verification token: {token}");
             }
             catch
             {
                 throw;
             }
         }
-
         private async Task<List<Claim>> GetUserClaims(SiteUser user)
         {
             try
             {
                 List<Claim> claimList = new List<Claim>
                 {
-                    new Claim("UId", user.Id),
-                    new Claim("FirstName", user.FirstName),
-                    new Claim("LastName", user.LastName),
-                    new Claim("Email", user.Email),
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                    new(ClaimTypes.Name, user.UserName),
+                    new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                    new(JwtRegisteredClaimNames.Sub, user.Email),
+                    new(JwtRegisteredClaimNames.Email, user.Email),
+                    new(JwtRegisteredClaimNames.Iat, DateTime.Now.ToString())
                 };
 
-                var userRoles = await _userManager.GetRolesAsync(user);
+                IEnumerable<string> userRoles = await _siteUserService.GetUserRolesAsync(user);
 
-                if (userRoles != null && userRoles.Count > 0)
+                if (userRoles != null && userRoles.Count() > 0)
                 {
                     claimList.AddRange(userRoles.Select(x => new Claim(ClaimTypes.Role, x)));
                 }

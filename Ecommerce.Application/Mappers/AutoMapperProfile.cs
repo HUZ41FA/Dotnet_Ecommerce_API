@@ -1,6 +1,6 @@
 ﻿using AutoMapper;
 using ECommerce.Application.Dtos.Authentication;
-using ECommerce.Domain.Application;
+using ECommerce.Domain.Models.Application;
 
 namespace ECommerce.Application.Mappers
 {

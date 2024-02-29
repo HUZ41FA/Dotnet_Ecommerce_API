@@ -1,7 +1,8 @@
 ﻿using AutoMapper;
 using ECommerce.Application.Dtos.Authentication;
 using ECommerce.Application.Services;
-using ECommerce.Domain.Application;
+using ECommerce.Domain.Abstractions.IServices.Application;
+using ECommerce.Domain.Models.Application;
 using ECommerce.Utilities.Helper;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -13,21 +14,14 @@ namespace ECommerce.Api.Controllers
     public class AuthenticationController : Controller
     {
         private readonly IMapper _mapper;
-        private readonly AuthenticationService _authenticationService;
-
-        public AuthenticationController(AuthenticationService authenticationService, IMapper mapper)
+        private readonly IApplicationAuthenticationService _authenticationService;
+        public AuthenticationController(IApplicationAuthenticationService authenticationService, IMapper mapper)
         {
             _authenticationService = authenticationService;
             _mapper = mapper;
         }
 
-        [HttpGet]
-        public IActionResult Index()
-        {
-            return StatusCode(StatusCodes.Status200OK, new { Message = "It is wortking fine"});
-        }
-
-        [HttpPost]
+        [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterDto model)
         {
             try
@@ -151,8 +145,8 @@ namespace ECommerce.Api.Controllers
 
                 if(Helper.ConfirmPassword(model.Password, model.ConfirmPassword))
                 {
-                    response = await _authenticationService.ResetPassword(model);
-                    }
+                    response = await _authenticationService.ResetPassword(model.Email, model.Password, model.ConfirmPassword, model.Token);
+                }
                 else
                 {
                     response.Messages.Add("Passwords do not match");

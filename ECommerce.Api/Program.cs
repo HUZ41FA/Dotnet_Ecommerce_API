@@ -1,11 +1,17 @@
 using ECommerce.Application.Services;
-using ECommerce.Domain.Application;
+using ECommerce.Domain.Abstractions.IServices.Application;
+using ECommerce.Domain.Abstractions.IUnitOfWork;
+using ECommerce.Domain.Models.Application;
 using ECommerce.Infrastructure.DataAccess.ApplicationDbContext;
+using ECommerce.Infrastructure.DataAccess.UnitOfWork;
 using ECommerce.Infrastructure.Email;
 using ECommerce.Utilities.Helper;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Text;
 
 namespace ECommerce.Api
 {
@@ -19,23 +25,54 @@ namespace ECommerce.Api
             var serverVersion = ServerVersion.AutoDetect(connectionString);
             var emailConfig = configuration.GetSection("EmailConfiguration").Get<EmailConfig>();
             var jwtConfig = configuration.GetSection("JWT").Get<JwtConfig>();
-            // Add services to the container.
+
             builder.Services.AddControllers();
-
-            // For Entityframework
-            builder.Services.AddDbContext<ApplicationDBContext>(options => options.UseMySql(configuration.GetConnectionString("DefaultConnectionString"), serverVersion));
-
             
-            builder.Services.AddSingleton(emailConfig);
-            builder.Services.AddSingleton(jwtConfig);
-
-            // Add Identity
+            // Adding DbContext
+            builder.Services.AddDbContext<ApplicationDBContext>(options => options.UseMySql(configuration.GetConnectionString("DefaultConnectionString"), serverVersion));
+            
+            // Adding identity
             builder.Services.AddIdentity<SiteUser, IdentityRole>()
                 .AddEntityFrameworkStores<ApplicationDBContext>()
                 .AddDefaultTokenProviders();
 
+            builder.Services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+                .AddJwtBearer(options =>
+                {
+                    options.SaveToken = true;
+                    options.RequireHttpsMetadata = false;
+                    options.TokenValidationParameters = new TokenValidationParameters()
+                    {
+                        ValidateAudience = false, // only for development
+                        ValidateIssuer = false, // only for development
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:Secret"])),
+                        RequireExpirationTime = false, // Will update when refresh token is added
+                        ValidateLifetime = true
+                    };
+                });
+
+            // Auto Mappers
             builder.Services.AddAutoMapper(typeof(Program).Assembly);
+
+            // My Services
+            builder.Services.AddSingleton(emailConfig);
+            builder.Services.AddSingleton(jwtConfig);
+            builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+            builder.Services.AddScoped<IEmailService, EmailService>();
+            builder.Services.AddScoped<IApplicationAuthenticationService, ApplicationAuthenticationService>();
+            builder.Services.AddScoped<ISiteUserService, SiteUserService>();
+
+            // Configure the routing to use lowercase
+            builder.Services.AddRouting(options => options.LowercaseUrls = true);
+
             builder.Services.AddEndpointsApiExplorer();
+
+            // Adding swagger with authentication token feature
             builder.Services.AddSwaggerGen(option =>
             {
                 option.SwaggerDoc("v1", new OpenApiInfo { Title = "Auth API", Version = "v1" });
@@ -63,9 +100,6 @@ namespace ECommerce.Api
                     }
                 });
             });
-            builder.Services.AddRouting(options => options.LowercaseUrls = true);
-            builder.Services.AddScoped<AuthenticationService, AuthenticationService>();
-            builder.Services.AddScoped<EmailService, EmailService>();
 
             var app = builder.Build();
 
@@ -77,6 +111,8 @@ namespace ECommerce.Api
             }
 
             app.UseHttpsRedirection();
+
+            app.UseAuthentication();
 
             app.UseAuthorization();
 

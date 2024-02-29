@@ -1,4 +1,4 @@
-﻿using ECommerce.Domain.Common;
+﻿using ECommerce.Domain.Models.Common;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ECommerce.Domain.Application
+namespace ECommerce.Domain.Models.Application
 {
     [PrimaryKey("AddressId", "UserId")]
     public class UserAddress : CommonFields

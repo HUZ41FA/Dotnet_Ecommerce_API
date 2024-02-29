@@ -1,11 +1,12 @@
-﻿using ECommerce.Infrastructure.Email;
+﻿using ECommerce.Domain.Abstractions.IServices.Application;
+using ECommerce.Infrastructure.Email;
 using ECommerce.Utilities.Helper;
 using MailKit.Net.Smtp;
 using MimeKit;
 
 namespace ECommerce.Application.Services
 {
-    public class EmailService
+    public class EmailService : IEmailService
     {
         private readonly EmailConfig _emailConfig;
 
@@ -13,14 +14,12 @@ namespace ECommerce.Application.Services
         {
             _emailConfig = emailConfig;
         }
-
-        public void SendMail(string[] emailList, string subject, string content)
+        public async Task SendMailAsync(string[] emailList, string subject, string content)
         {
             Message message = new Message(emailList, subject, content);
             MimeMessage emailMessage = CreateEmailMessage(message);
-            Send(emailMessage);
+            await SendAsync(emailMessage);
         }
-
         private MimeMessage CreateEmailMessage(Message message)
         {
             var emailMessage = new MimeMessage();
@@ -31,17 +30,16 @@ namespace ECommerce.Application.Services
 
             return emailMessage;
         }
-
-        private void Send(MimeMessage mailMessage)
+        private async Task SendAsync(MimeMessage mailMessage)
         {
             using var client = new SmtpClient();
             try
             {
-                client.Connect(_emailConfig.SmtpServer, _emailConfig.Port, true);
+                await client.ConnectAsync(_emailConfig.SmtpServer, _emailConfig.Port, true);
                 client.AuthenticationMechanisms.Remove("XOAUTH2");
-                client.Authenticate(_emailConfig.Username, _emailConfig.Password);
+                await client.AuthenticateAsync(_emailConfig.Username, _emailConfig.Password);
 
-                client.Send(mailMessage);
+                await client.SendAsync(mailMessage);
             }
             catch
             {
@@ -49,7 +47,7 @@ namespace ECommerce.Application.Services
             }
             finally
             {
-                client.Disconnect(true);
+                await client.DisconnectAsync(true);
                 client.Dispose();
             }
         }

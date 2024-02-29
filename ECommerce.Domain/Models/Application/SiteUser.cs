@@ -1,4 +1,4 @@
-﻿using ECommerce.Domain.Common;
+﻿using ECommerce.Domain.Models.Common;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
-namespace ECommerce.Domain.Application
+namespace ECommerce.Domain.Models.Application
 {
     public class SiteUser : IdentityUser, ICommonFields
     {
