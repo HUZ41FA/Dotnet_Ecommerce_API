@@ -217,3 +217,5 @@ AppPackages/
 /ECommerce.Api/apsettings.Production.json
 /ECommerce.Api/apsettings.UAT.json
 /ECommerce.Api/apsettings.QA.json
+/ECommerce.Api/appsettings.Development.json
+/ECommerce.Api/appsettings.Local.json
